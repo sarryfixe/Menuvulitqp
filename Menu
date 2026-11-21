@@ -1,0 +1,1506 @@
+--==================================================
+-- VULITQPHUB V2.1 FULL - PURPLE EDITION
+-- by sarry_fixe
+-- INTRO + LOADING + KEY SYSTEM
+-- MAIN MENU + 4 TABS
+-- FLY + SPEED + NOCLIP
+-- SPEED LIMIT: 1 - 1000
+-- MENU: 560 x 360
+--==================================================
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local GuiService = game:GetService("GuiService")
+
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+--==================================================
+-- SETTINGS
+--==================================================
+
+local KEY = "lkjhgfdsa"
+local DISCORD = "https://discord.gg/6cRkHcNTC"
+local GET_KEY = "https://anotepad.com/notes/hpc3n3ci"
+
+local PURPLE = Color3.fromRGB(168, 85, 247)
+local DARK_PURPLE = Color3.fromRGB(109, 40, 217)
+local BG = Color3.fromRGB(17, 12, 27)
+local PANEL = Color3.fromRGB(29, 20, 44)
+local CARD = Color3.fromRGB(39, 27, 57)
+local WHITE = Color3.fromRGB(245, 240, 255)
+local MUTED = Color3.fromRGB(170, 150, 190)
+
+local FlySpeed = 50
+local WalkSpeedValue = 50
+
+local FlyEnabled = false
+local SpeedEnabled = false
+local NoclipEnabled = false
+
+local FlyUp = false
+local FlyDown = false
+
+local Character
+local Humanoid
+local RootPart
+local FlyVelocity
+local FlyGyro
+
+local OriginalCollision = {}
+
+local MainFrame
+local ReopenButton
+local FlyToggleButton
+local SpeedToggleButton
+local NoclipToggleButton
+
+local Connections = {}
+
+--==================================================
+-- CHARACTER
+--==================================================
+
+local function UpdateCharacter(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    RootPart = char:WaitForChild("HumanoidRootPart")
+
+    if SpeedEnabled then
+        Humanoid.WalkSpeed = WalkSpeedValue
+    end
+end
+
+if Player.Character then
+    UpdateCharacter(Player.Character)
+end
+
+--==================================================
+-- GUI
+--==================================================
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "vulitqp hub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = PlayerGui
+
+local function New(class, props, parent)
+    local obj = Instance.new(class)
+
+    for k, v in pairs(props or {}) do
+        obj[k] = v
+    end
+
+    obj.Parent = parent
+    return obj
+end
+
+local function Corner(parent, radius)
+    New("UICorner", {
+        CornerRadius = UDim.new(0, radius or 8)
+    }, parent)
+end
+
+local function Stroke(parent, color, thickness)
+    New("UIStroke", {
+        Color = color or PURPLE,
+        Thickness = thickness or 1
+    }, parent)
+end
+
+local function Tween(obj, duration, props)
+    local tw = TweenService:Create(
+        obj,
+        TweenInfo.new(
+            duration,
+            Enum.EasingStyle.Quart,
+            Enum.EasingDirection.Out
+        ),
+        props
+    )
+
+    tw:Play()
+    return tw
+end
+
+local function Label(parent, text, size, position, textSize)
+    return New("TextLabel", {
+        BackgroundTransparency = 1,
+        Text = text,
+        Size = size,
+        Position = position,
+        Font = Enum.Font.GothamBold,
+        TextSize = textSize or 14,
+        TextColor3 = WHITE,
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, parent)
+end
+
+local function Button(parent, text, size, position)
+    local b = New("TextButton", {
+        Size = size,
+        Position = position,
+        BackgroundColor3 = CARD,
+        Text = text,
+        TextColor3 = WHITE,
+        Font = Enum.Font.GothamBold,
+        TextSize = 12,
+        AutoButtonColor = false
+    }, parent)
+
+    Corner(b, 7)
+    Stroke(b, PURPLE, 1)
+
+    b.MouseEnter:Connect(function()
+        Tween(b, 0.15, {
+            BackgroundColor3 = DARK_PURPLE
+        })
+    end)
+
+    b.MouseLeave:Connect(function()
+        if b.Text:find("ON") then
+            return
+        end
+
+        Tween(b, 0.15, {
+            BackgroundColor3 = CARD
+        })
+    end)
+
+    return b
+end
+
+local function Input(parent, placeholder, size, position, default)
+    local box = New("TextBox", {
+        Size = size,
+        Position = position,
+        BackgroundColor3 = BG,
+        Text = tostring(default or ""),
+        PlaceholderText = placeholder,
+        TextColor3 = WHITE,
+        PlaceholderColor3 = MUTED,
+        Font = Enum.Font.Gotham,
+        TextSize = 13,
+        ClearTextOnFocus = false
+    }, parent)
+
+    Corner(box, 6)
+    Stroke(box, PURPLE, 1)
+
+    return box
+end
+
+local function MakeCard(parent, height)
+    local card = New("Frame", {
+        Size = UDim2.new(1, -16, 0, height),
+        BackgroundColor3 = PANEL
+    }, parent)
+
+    Corner(card, 9)
+    Stroke(card, Color3.fromRGB(90, 55, 125), 1)
+
+    return card
+end
+
+--==================================================
+-- INTRO
+--==================================================
+
+local Intro = New("Frame", {
+    Size = UDim2.fromOffset(0, 0),
+    Position = UDim2.new(0.5, 0, 0.5, 0),
+    BackgroundColor3 = BG,
+    ClipsDescendants = true
+}, ScreenGui)
+
+Corner(Intro, 15)
+Stroke(Intro, PURPLE, 2)
+
+local IntroTitle = Label(
+    Intro,
+    "VULITQPHUB",
+    UDim2.new(1, 0, 0, 45),
+    UDim2.fromOffset(0, 45),
+    25
+)
+IntroTitle.TextXAlignment = Enum.TextXAlignment.Center
+IntroTitle.TextColor3 = PURPLE
+
+local IntroSub = Label(
+    Intro,
+    "by sarry_fixe",
+    UDim2.new(1, 0, 0, 25),
+    UDim2.fromOffset(0, 90),
+    13
+)
+IntroSub.TextXAlignment = Enum.TextXAlignment.Center
+IntroSub.TextColor3 = MUTED
+
+local IntroDot = New("Frame", {
+    Size = UDim2.fromOffset(10, 10),
+    Position = UDim2.new(0.5, -5, 0.5, -5),
+    BackgroundColor3 = PURPLE
+}, ScreenGui)
+Corner(IntroDot, 50)
+
+Tween(IntroDot, 0.35, {
+    Size = UDim2.fromOffset(24, 24),
+    Position = UDim2.new(0.5, -12, 0.5, -12)
+})
+
+task.wait(0.4)
+
+Tween(IntroDot, 0.3, {
+    Size = UDim2.fromOffset(0, 0)
+})
+
+Tween(Intro, 0.6, {
+    Size = UDim2.fromOffset(430, 230),
+    Position = UDim2.new(0.5, -215, 0.5, -115)
+})
+
+task.wait(0.8)
+IntroDot:Destroy()
+
+--==================================================
+-- LOADING
+--==================================================
+
+local LoadingText = Label(
+    Intro,
+    "LOADING...",
+    UDim2.new(1, -40, 0, 20),
+    UDim2.fromOffset(20, 155),
+    12
+)
+LoadingText.TextColor3 = PURPLE
+
+local LoadingBack = New("Frame", {
+    Size = UDim2.new(1, -40, 0, 9),
+    Position = UDim2.fromOffset(20, 185),
+    BackgroundColor3 = CARD
+}, Intro)
+Corner(LoadingBack, 10)
+
+local LoadingBar = New("Frame", {
+    Size = UDim2.new(0, 0, 1, 0),
+    BackgroundColor3 = PURPLE
+}, LoadingBack)
+Corner(LoadingBar, 10)
+
+for i = 1, 100 do
+    LoadingBar.Size = UDim2.new(i / 100, 0, 1, 0)
+    LoadingText.Text = "LOADING... " .. i .. "%"
+    task.wait(0.018)
+end
+
+Tween(Intro, 0.3, {
+    BackgroundTransparency = 1
+})
+
+task.wait(0.35)
+Intro:Destroy()
+
+--==================================================
+-- KEY SYSTEM
+--==================================================
+
+local KeyFrame = New("Frame", {
+    Size = UDim2.fromOffset(430, 290),
+    Position = UDim2.new(0.5, -215, 0.5, -145),
+    BackgroundColor3 = BG
+}, ScreenGui)
+
+Corner(KeyFrame, 14)
+Stroke(KeyFrame, PURPLE, 2)
+
+local KeyTitle = Label(
+    KeyFrame,
+    "vulitqp hub| KEY SYSTEM",
+    UDim2.new(1, -30, 0, 35),
+    UDim2.fromOffset(15, 15),
+    17
+)
+KeyTitle.TextColor3 = PURPLE
+
+Label(
+    KeyFrame,
+    "Enter your key to continue",
+    UDim2.new(1, -30, 0, 25),
+    UDim2.fromOffset(15, 55),
+    12
+).TextColor3 = MUTED
+
+local KeyInput = Input(
+    KeyFrame,
+    "Enter key here...",
+    UDim2.new(1, -40, 0, 40),
+    UDim2.fromOffset(20, 100),
+    ""
+)
+
+local GetKeyButton = Button(
+    KeyFrame,
+    "GET KEY",
+    UDim2.new(0.44, 0, 0, 38),
+    UDim2.fromOffset(20, 160)
+)
+
+local VerifyButton = Button(
+    KeyFrame,
+    "VERIFY",
+    UDim2.new(0.44, 0, 0, 38),
+    UDim2.new(0.56, -5, 0, 160)
+)
+
+local KeyStatus = Label(
+    KeyFrame,
+    "Status: Waiting for key",
+    UDim2.new(1, -40, 0, 25),
+    UDim2.fromOffset(20, 215),
+    12
+)
+KeyStatus.TextColor3 = MUTED
+
+GetKeyButton.MouseButton1Click:Connect(function()
+    pcall(function()
+        GuiService:OpenBrowserWindow(GET_KEY)
+    end)
+end)
+
+local Verified = false
+
+VerifyButton.MouseButton1Click:Connect(function()
+    if KeyInput.Text == KEY then
+        Verified = true
+        KeyStatus.Text = "Status: Correct key!"
+        KeyStatus.TextColor3 = PURPLE
+
+        Tween(KeyFrame, 0.25, {
+            BackgroundColor3 = Color3.fromRGB(40, 25, 60)
+        })
+    else
+        KeyStatus.Text = "Status: Incorrect key!"
+        KeyStatus.TextColor3 = Color3.fromRGB(255, 90, 120)
+    end
+end)
+
+repeat task.wait() until Verified
+KeyFrame:Destroy()
+
+--==================================================
+-- MAIN MENU - 560 x 360
+--==================================================
+
+MainFrame = New("Frame", {
+    Size = UDim2.fromOffset(560, 360),
+    Position = UDim2.new(0.5, -280, 0.5, -180),
+    BackgroundColor3 = BG,
+    ClipsDescendants = true
+}, ScreenGui)
+
+Corner(MainFrame, 13)
+Stroke(MainFrame, PURPLE, 2)
+
+-- HEADER
+
+local Header = New("Frame", {
+    Size = UDim2.new(1, 0, 0, 42),
+    BackgroundColor3 = Color3.fromRGB(24, 15, 38)
+}, MainFrame)
+
+local HeaderTitle = Label(
+    Header,
+    "VULITQPHUB",
+    UDim2.fromOffset(200, 42),
+    UDim2.fromOffset(14, 0),
+    17
+)
+HeaderTitle.TextColor3 = PURPLE
+
+local MinimizeButton = Button(
+    Header,
+    "—",
+    UDim2.fromOffset(30, 27),
+    UDim2.new(1, -75, 0, 7)
+)
+
+local CloseButton = Button(
+    Header,
+    "X",
+    UDim2.fromOffset(30, 27),
+    UDim2.new(1, -38, 0, 7)
+)
+
+-- DRAG
+
+local dragging = false
+local dragStart
+local startPos
+
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if dragging and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
+        local delta = input.Position - dragStart
+
+        MainFrame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+-- SIDEBAR
+
+local Sidebar = New("Frame", {
+    Size = UDim2.new(0, 125, 1, -42),
+    Position = UDim2.fromOffset(0, 42),
+    BackgroundColor3 = Color3.fromRGB(23, 16, 36)
+}, MainFrame)
+
+local SideTitle = Label(
+    Sidebar,
+    "MENU",
+    UDim2.new(1, -20, 0, 30),
+    UDim2.fromOffset(12, 12),
+    12
+)
+SideTitle.TextColor3 = PURPLE
+
+local Content = New("Frame", {
+    Size = UDim2.new(1, -125, 1, -42),
+    Position = UDim2.fromOffset(125, 42),
+    BackgroundTransparency = 1
+}, MainFrame)
+
+local PageTitle = Label(
+    Content,
+    "TRANG CHỦ",
+    UDim2.new(1, -20, 0, 35),
+    UDim2.fromOffset(12, 5),
+    16
+)
+PageTitle.TextColor3 = PURPLE
+
+local Pages = {}
+local TabButtons = {}
+
+local function CreatePage(name)
+    local page = New("ScrollingFrame", {
+        Size = UDim2.new(1, 0, 1, -45),
+        Position = UDim2.fromOffset(0, 45),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 3,
+        ScrollBarImageColor3 = PURPLE,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        Visible = false
+    }, Content)
+
+    local layout = New("UIListLayout", {
+        Padding = UDim.new(0, 9),
+        SortOrder = Enum.SortOrder.LayoutOrder
+    }, page)
+
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(
+            0, 0, 0,
+            layout.AbsoluteContentSize.Y + 15
+        )
+    end)
+
+    New("UIPadding", {
+        PaddingLeft = UDim.new(0, 8),
+        PaddingRight = UDim.new(0, 8),
+        PaddingTop = UDim.new(0, 5),
+        PaddingBottom = UDim.new(0, 10)
+    }, page)
+
+    Pages[name] = page
+    return page
+end
+
+local function CreateTab(name, order)
+    local button = Button(
+        Sidebar,
+        name,
+        UDim2.new(1, -16, 0, 36),
+        UDim2.fromOffset(8, 48 + (order - 1) * 44)
+    )
+
+    TabButtons[name] = button
+
+    button.MouseButton1Click:Connect(function()
+        for pageName, page in pairs(Pages) do
+            page.Visible = pageName == name
+        end
+
+        for tabName, tab in pairs(TabButtons) do
+            tab.BackgroundColor3 =
+                tabName == name and DARK_PURPLE or CARD
+        end
+
+        PageTitle.Text = string.upper(name)
+    end)
+end
+
+local HomePage = CreatePage("Trang chủ")
+local CommonPage = CreatePage("Chung")
+local FunctionPage = CreatePage("TSB")
+local SettingsPage = CreatePage("Cài đặt")
+
+CreateTab("Trang chủ", 1)
+CreateTab("Chung", 2)
+CreateTab("TSB", 3)
+CreateTab("Cài đặt", 4)
+
+local function SwitchTab(name)
+    for pageName, page in pairs(Pages) do
+        page.Visible = pageName == name
+    end
+
+    for tabName, tab in pairs(TabButtons) do
+        tab.BackgroundColor3 =
+            tabName == name and DARK_PURPLE or CARD
+    end
+
+    PageTitle.Text = string.upper(name)
+end
+
+SwitchTab("Trang chủ")
+
+--==================================================
+-- HOME PAGE
+--==================================================
+
+local HomeCard = MakeCard(HomePage, 125)
+
+Label(
+    HomeCard,
+    "WELCOME TO VULITQPHUB",
+    UDim2.new(1, -20, 0, 25),
+    UDim2.fromOffset(12, 10),
+    15
+).TextColor3 = PURPLE
+
+Label(
+    HomeCard,
+    "Script do người Việt Nam làm nên nên hơi lỗi nha\nJoin dis để xem update script\nJoin discord me ❤️",
+    UDim2.new(1, -20, 0, 65),
+    UDim2.fromOffset(12, 40),
+    12
+).TextColor3 = MUTED
+
+local DiscordCard = MakeCard(HomePage, 95)
+
+Label(
+    DiscordCard,
+    "DISCORD COMMUNITY",
+    UDim2.new(1, -20, 0, 22),
+    UDim2.fromOffset(12, 8),
+    13
+).TextColor3 = PURPLE
+
+Label(
+    DiscordCard,
+    "discord.gg/6cRkHcNTC",
+    UDim2.new(1, -20, 0, 20),
+    UDim2.fromOffset(12, 32),
+    12
+).TextColor3 = MUTED
+
+local CopyDiscord = Button(
+    DiscordCard,
+    "COPY DISCORD LINK",
+    UDim2.new(1, -24, 0, 30),
+    UDim2.fromOffset(12, 58)
+)
+
+CopyDiscord.MouseButton1Click:Connect(function()
+    if typeof(setclipboard) == "function" then
+        local success = pcall(setclipboard, DISCORD)
+
+        if success then
+            CopyDiscord.Text = "COPIED!"
+        else
+            CopyDiscord.Text = "COPY NOT AVAILABLE"
+        end
+    else
+        CopyDiscord.Text = "COPY NOT AVAILABLE"
+    end
+end)
+
+--==================================================
+-- COMMON PAGE - FLY
+--==================================================
+
+local FlyCard = MakeCard(CommonPage, 150)
+
+local FlyTitle = Label(
+    FlyCard,
+    "FLY",
+    UDim2.new(1, -20, 0, 25),
+    UDim2.fromOffset(12, 8),
+    15
+)
+FlyTitle.TextColor3 = PURPLE
+
+Label(
+    FlyCard,
+    "Bay len / WASD, Space va Ctrl",
+    UDim2.new(1, -20, 0, 20),
+    UDim2.fromOffset(12, 34),
+    10
+).TextColor3 = MUTED
+
+FlyToggleButton = Button(
+    FlyCard,
+    "FLY: OFF",
+    UDim2.fromOffset(105, 32),
+    UDim2.fromOffset(12, 65)
+)
+
+local FlyUpButton = Button(
+    FlyCard,
+    "UP",
+    UDim2.fromOffset(75, 32),
+    UDim2.fromOffset(128, 65)
+)
+
+local FlyDownButton = Button(
+    FlyCard,
+    "DOWN",
+    UDim2.fromOffset(75, 32),
+    UDim2.fromOffset(210, 65)
+)
+
+local FlySpeedInput = Input(
+    FlyCard,
+    "Fly speed",
+    UDim2.fromOffset(100, 30),
+    UDim2.fromOffset(295, 66),
+    FlySpeed
+)
+
+local function StopFly()
+    FlyEnabled = false
+    FlyUp = false
+    FlyDown = false
+
+    if FlyVelocity then
+        FlyVelocity:Destroy()
+        FlyVelocity = nil
+    end
+
+    if FlyGyro then
+        FlyGyro:Destroy()
+        FlyGyro = nil
+    end
+
+    if Humanoid then
+        Humanoid.PlatformStand = false
+        Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+    end
+
+    if FlyToggleButton then
+        FlyToggleButton.Text = "FLY: OFF"
+        FlyToggleButton.BackgroundColor3 = CARD
+    end
+end
+
+local function StartFly()
+    if not RootPart or not Humanoid then
+        return
+    end
+
+    FlyEnabled = true
+    FlyToggleButton.Text = "FLY: ON"
+    FlyToggleButton.BackgroundColor3 = DARK_PURPLE
+
+    Humanoid.PlatformStand = true
+
+    FlyVelocity = Instance.new("BodyVelocity")
+    FlyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    FlyVelocity.P = 1e5
+    FlyVelocity.Velocity = Vector3.zero
+    FlyVelocity.Parent = RootPart
+
+    FlyGyro = Instance.new("BodyGyro")
+    FlyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+    FlyGyro.P = 1e5
+    FlyGyro.CFrame = RootPart.CFrame
+    FlyGyro.Parent = RootPart
+end
+
+FlyToggleButton.MouseButton1Click:Connect(function()
+    if FlyEnabled then
+        StopFly()
+    else
+        StartFly()
+    end
+end)
+
+FlyUpButton.MouseButton1Down:Connect(function()
+    FlyUp = true
+end)
+
+FlyUpButton.MouseButton1Up:Connect(function()
+    FlyUp = false
+end)
+
+FlyDownButton.MouseButton1Down:Connect(function()
+    FlyDown = true
+end)
+
+FlyDownButton.MouseButton1Up:Connect(function()
+    FlyDown = false
+end)
+
+FlySpeedInput.FocusLost:Connect(function()
+    local value = tonumber(FlySpeedInput.Text)
+
+    if value then
+        FlySpeed = math.clamp(math.floor(value), 1, 1000)
+    end
+
+    FlySpeedInput.Text = tostring(FlySpeed)
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not FlyEnabled or not FlyVelocity or not RootPart then
+        return
+    end
+
+    local camera = workspace.CurrentCamera
+    if not camera then
+        return
+    end
+
+    local move = Humanoid and Humanoid.MoveDirection or Vector3.zero
+    local vertical = 0
+
+    if UIS:IsKeyDown(Enum.KeyCode.Space) or FlyUp then
+        vertical += 1
+    end
+
+    if UIS:IsKeyDown(Enum.KeyCode.LeftControl)
+        or UIS:IsKeyDown(Enum.KeyCode.C)
+        or FlyDown then
+        vertical -= 1
+    end
+
+    FlyVelocity.Velocity =
+        move * FlySpeed + Vector3.new(0, vertical * FlySpeed, 0)
+
+    if FlyGyro then
+        FlyGyro.CFrame = camera.CFrame
+    end
+end)
+
+--==================================================
+-- COMMON PAGE - SPEED BOOSTER
+--==================================================
+
+local SpeedCard = MakeCard(CommonPage, 145)
+
+local SpeedTitle = Label(
+    SpeedCard,
+    "SPEED BOOSTER",
+    UDim2.new(1, -20, 0, 25),
+    UDim2.fromOffset(12, 8),
+    15
+)
+SpeedTitle.TextColor3 = PURPLE
+
+Label(
+    SpeedCard,
+    "Speed rieng, khong phu thuoc FLY",
+    UDim2.new(1, -20, 0, 20),
+    UDim2.fromOffset(12, 32),
+    10
+).TextColor3 = MUTED
+
+SpeedToggleButton = Button(
+    SpeedCard,
+    "SPEED: OFF",
+    UDim2.fromOffset(120, 32),
+    UDim2.fromOffset(12, 58)
+)
+
+local SpeedInput = Input(
+    SpeedCard,
+    "1 - 1000",
+    UDim2.fromOffset(100, 32),
+    UDim2.fromOffset(145, 58),
+    WalkSpeedValue
+)
+
+local SpeedBar = New("Frame", {
+    Size = UDim2.new(1, -24, 0, 8),
+    Position = UDim2.fromOffset(12, 112),
+    BackgroundColor3 = BG
+}, SpeedCard)
+Corner(SpeedBar, 8)
+
+local SpeedFill = New("Frame", {
+    Size = UDim2.new(WalkSpeedValue / 1000, 0, 1, 0),
+    BackgroundColor3 = PURPLE
+}, SpeedBar)
+Corner(SpeedFill, 8)
+
+local SpeedKnob = New("Frame", {
+    Size = UDim2.fromOffset(16, 16),
+    Position = UDim2.new(WalkSpeedValue / 1000, -8, 0.5, -8),
+    BackgroundColor3 = WHITE
+}, SpeedBar)
+Corner(SpeedKnob, 50)
+Stroke(SpeedKnob, PURPLE, 2)
+
+local function SetSpeed(value)
+    WalkSpeedValue = math.clamp(
+        math.floor(tonumber(value) or 50),
+        1,
+        1000
+    )
+
+    SpeedInput.Text = tostring(WalkSpeedValue)
+
+    local percent = WalkSpeedValue / 1000
+
+    SpeedFill.Size = UDim2.new(percent, 0, 1, 0)
+    SpeedKnob.Position = UDim2.new(percent, -8, 0.5, -8)
+
+    if SpeedEnabled and Humanoid then
+        Humanoid.WalkSpeed = WalkSpeedValue
+    end
+end
+
+SpeedInput.FocusLost:Connect(function()
+    local value = tonumber(SpeedInput.Text)
+
+    if value then
+        SetSpeed(value)
+    else
+        SpeedInput.Text = tostring(WalkSpeedValue)
+    end
+end)
+
+local SpeedSliding = false
+
+local function UpdateSpeedSlider(x)
+    local percent = math.clamp(
+        (x - SpeedBar.AbsolutePosition.X) /
+        SpeedBar.AbsoluteSize.X,
+        0,
+        1
+    )
+
+    SetSpeed(1 + percent * 999)
+end
+
+SpeedBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        SpeedSliding = true
+        UpdateSpeedSlider(input.Position.X)
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if SpeedSliding and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
+        UpdateSpeedSlider(input.Position.X)
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        SpeedSliding = false
+    end
+end)
+
+SpeedToggleButton.MouseButton1Click:Connect(function()
+    SpeedEnabled = not SpeedEnabled
+
+    if SpeedEnabled then
+        SpeedToggleButton.Text = "SPEED: ON"
+        SpeedToggleButton.BackgroundColor3 = DARK_PURPLE
+
+        if Humanoid then
+            Humanoid.WalkSpeed = WalkSpeedValue
+        end
+    else
+        SpeedToggleButton.Text = "SPEED: OFF"
+        SpeedToggleButton.BackgroundColor3 = CARD
+
+        if Humanoid then
+            Humanoid.WalkSpeed = 16
+        end
+    end
+end)
+
+--==================================================
+-- COMMON PAGE - NOCLIP
+--==================================================
+
+local NoclipCard = MakeCard(CommonPage, 90)
+
+Label(
+    NoclipCard,
+    "NOCLIP",
+    UDim2.new(1, -20, 0, 25),
+    UDim2.fromOffset(12, 8),
+    15
+).TextColor3 = PURPLE
+
+Label(
+    NoclipCard,
+    "Di qua vat can trong game cua ban",
+    UDim2.new(1, -20, 0, 20),
+    UDim2.fromOffset(12, 33),
+    10
+).TextColor3 = MUTED
+
+NoclipToggleButton = Button(
+    NoclipCard,
+    "NOCLIP: OFF",
+    UDim2.fromOffset(125, 30),
+    UDim2.fromOffset(12, 55)
+)
+
+NoclipToggleButton.MouseButton1Click:Connect(function()
+    NoclipEnabled = not NoclipEnabled
+
+    if NoclipEnabled then
+        NoclipToggleButton.Text = "NOCLIP: ON"
+        NoclipToggleButton.BackgroundColor3 = DARK_PURPLE
+    else
+        NoclipToggleButton.Text = "NOCLIP: OFF"
+        NoclipToggleButton.BackgroundColor3 = CARD
+
+        for part, oldValue in pairs(OriginalCollision) do
+            if part and part.Parent then
+                part.CanCollide = oldValue
+            end
+        end
+
+        table.clear(OriginalCollision)
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if not NoclipEnabled or not Character then
+        return
+    end
+
+    for _, part in ipairs(Character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if OriginalCollision[part] == nil then
+                OriginalCollision[part] = part.CanCollide
+            end
+
+            part.CanCollide = false
+        end
+    end
+end)
+
+--==================================================
+-- TSB - EVENT HALLOWEEN V2
+-- VULITQPHUB V2.1 PURPLE EDITION
+-- by sarry_fixe
+-- INSTANT CANDY PRIORITY
+-- CANDY + DOOR
+--==================================================
+
+local HalloweenFolder =
+    workspace:WaitForChild("HalloweenCandy")
+
+local HalloweenTrees =
+    workspace:WaitForChild("HalloweenDoorTrees")
+
+local FarmCandyEnabled = false
+local FarmCandyThread = nil
+
+local CandySpawned = false
+local ScanDelay = 0.1
+
+--==================================================
+-- GUI CARD
+--==================================================
+
+local FarmCandyCard = MakeCard(FunctionPage, 115)
+
+Label(
+    FarmCandyCard,
+    "EVENT HALLOWEEN",
+    UDim2.new(1, -20, 0, 25),
+    UDim2.fromOffset(12, 8),
+    15
+).TextColor3 = PURPLE
+
+Label(
+    FarmCandyCard,
+    "Tu dong nhat keo va di den cua",
+    UDim2.new(1, -20, 0, 20),
+    UDim2.fromOffset(12, 34),
+    10
+).TextColor3 = MUTED
+
+local FarmCandyButton = Button(
+    FarmCandyCard,
+    "FARM CANDY: OFF",
+    UDim2.fromOffset(145, 32),
+    UDim2.fromOffset(12, 65)
+)
+
+local FarmCandyStatus = Label(
+    FarmCandyCard,
+    "Status: Waiting...",
+    UDim2.new(1, -175, 0, 30),
+    UDim2.fromOffset(170, 66),
+    11
+)
+
+FarmCandyStatus.TextColor3 = MUTED
+
+--==================================================
+-- STATUS
+--==================================================
+
+local function SetFarmStatus(message, color)
+    FarmCandyStatus.Text = "Status: " .. message
+    FarmCandyStatus.TextColor3 = color or PURPLE
+end
+
+--==================================================
+-- CANDY DETECTION
+--==================================================
+
+HalloweenFolder.ChildAdded:Connect(function()
+    CandySpawned = true
+end)
+
+--==================================================
+-- GET CANDY POSITION
+--==================================================
+
+local function GetCandyPosition(candy)
+
+    local rest = candy:GetAttribute("Rest")
+
+    if typeof(rest) == "Instance"
+        and rest:IsA("BasePart")
+        and rest:IsDescendantOf(workspace) then
+
+        return rest.Position, rest
+
+    elseif typeof(rest) == "Vector3" then
+
+        return rest, nil
+
+    elseif typeof(rest) == "CFrame" then
+
+        return rest.Position, nil
+    end
+
+    if candy:IsA("BasePart") then
+        return candy.Position, candy
+
+    elseif candy:IsA("Model") then
+        return candy:GetPivot().Position, nil
+    end
+
+    local part = candy:FindFirstChildWhichIsA(
+        "BasePart",
+        true
+    )
+
+    if part then
+        return part.Position, part
+    end
+
+    return nil, nil
+end
+
+--==================================================
+-- FIND CLOSEST CANDY
+--==================================================
+
+local function FindClosestCandy(root)
+
+    local closestCandy = nil
+    local closestPosition = nil
+    local closestDistance = math.huge
+
+    for _, candy in ipairs(HalloweenFolder:GetChildren()) do
+
+        local position, part = GetCandyPosition(candy)
+
+        if position then
+
+            local distance =
+                (root.Position - position).Magnitude
+
+            if distance < closestDistance then
+
+                closestDistance = distance
+                closestCandy = candy
+                closestPosition = position
+
+            end
+        end
+    end
+
+    return closestCandy, closestPosition
+end
+
+--==================================================
+-- FIND CLOSEST DOOR
+--==================================================
+
+local function FindClosestDoor(root)
+
+    local closestPrompt = nil
+    local closestPart = nil
+    local closestDistance = math.huge
+
+    for _, tree in ipairs(HalloweenTrees:GetChildren()) do
+
+        local door = tree:FindFirstChild("DOOR 1 NEW")
+        local frame = door and door:FindFirstChild("Frame")
+
+        local prompt = frame and
+            frame:FindFirstChild("TrickOrTreat")
+
+        if prompt and prompt:IsA("ProximityPrompt") then
+
+            local part = prompt.Parent
+
+            if part and part:IsA("BasePart") then
+
+                local distance =
+                    (root.Position - part.Position).Magnitude
+
+                if distance < closestDistance then
+
+                    closestDistance = distance
+                    closestPrompt = prompt
+                    closestPart = part
+
+                end
+            end
+        end
+    end
+
+    return closestPrompt, closestPart
+end
+
+--==================================================
+-- STOP FARM
+--==================================================
+
+local function StopFarmCandy()
+
+    FarmCandyEnabled = false
+
+    FarmCandyButton.Text = "FARM CANDY: OFF"
+    FarmCandyButton.BackgroundColor3 = CARD
+
+    SetFarmStatus("Stopped", MUTED)
+
+    if Humanoid and RootPart then
+        Humanoid:MoveTo(RootPart.Position)
+    end
+end
+
+--==================================================
+-- START FARM
+--==================================================
+
+local function StartFarmCandy()
+
+    if FarmCandyEnabled then
+        return
+    end
+
+    FarmCandyEnabled = true
+
+    FarmCandyButton.Text = "FARM CANDY: ON"
+    FarmCandyButton.BackgroundColor3 = DARK_PURPLE
+
+    SetFarmStatus("Finding candy...", PURPLE)
+
+    FarmCandyThread = task.spawn(function()
+
+        while FarmCandyEnabled do
+
+            local character = Player.Character
+
+            local humanoid = character and
+                character:FindFirstChildOfClass("Humanoid")
+
+            local root = character and
+                character:FindFirstChild("HumanoidRootPart")
+
+            if not humanoid or not root
+                or humanoid.Health <= 0 then
+
+                SetFarmStatus(
+                    "Waiting for character...",
+                    MUTED
+                )
+
+                task.wait(0.5)
+                continue
+            end
+
+            --======================================
+            -- PRIORITY 1: CANDY
+            --======================================
+
+            local candy, position =
+                FindClosestCandy(root)
+
+            if candy and position then
+
+                CandySpawned = false
+
+                SetFarmStatus(
+                    "Candy detected! Collecting...",
+                    PURPLE
+                )
+
+                humanoid:MoveTo(
+                    position + Vector3.new(0, 2, 0)
+                )
+
+                -- Scan frequently for newly spawned candy
+                for i = 1, 5 do
+
+                    if not FarmCandyEnabled then
+                        break
+                    end
+
+                    task.wait(0.1)
+
+                    if CandySpawned then
+                        break
+                    end
+                end
+
+                continue
+            end
+
+            --======================================
+            -- PRIORITY 2: DOOR
+            --======================================
+
+            local prompt, part =
+                FindClosestDoor(root)
+
+            if prompt and part then
+
+                SetFarmStatus(
+                    "Visiting closest door...",
+                    PURPLE
+                )
+
+                humanoid:MoveTo(part.Position)
+
+                -- Keep checking for candy while approaching
+                for i = 1, 10 do
+
+                    if not FarmCandyEnabled then
+                        break
+                    end
+
+                    task.wait(0.1)
+
+                    if CandySpawned then
+                        break
+                    end
+                end
+
+                -- If no candy appeared, wait near the prompt
+                if FarmCandyEnabled
+                    and not CandySpawned
+                    and (root.Position - part.Position).Magnitude
+                        <= prompt.MaxActivationDistance then
+
+                    SetFarmStatus(
+                        "At door - waiting for prompt",
+                        PURPLE
+                    )
+                end
+
+            else
+
+                SetFarmStatus(
+                    "No candy - No doors found",
+                    MUTED
+                )
+
+                task.wait(0.3)
+            end
+        end
+
+    end)
+end
+
+--==================================================
+-- ON / OFF BUTTON
+--==================================================
+
+FarmCandyButton.MouseButton1Click:Connect(function()
+
+    if FarmCandyEnabled then
+        StopFarmCandy()
+    else
+        StartFarmCandy()
+    end
+end)
+
+--==================================================
+-- END HALLOWEEN V2
+--==================================================
+
+--==================================================
+-- SETTINGS PAGE
+--==================================================
+
+local SettingsCard = MakeCard(SettingsPage, 130)
+
+Label(
+    SettingsCard,
+    "CAI DAT",
+    UDim2.new(1, -20, 0, 25),
+    UDim2.fromOffset(12, 10),
+    15
+).TextColor3 = PURPLE
+
+Label(
+    SettingsCard,
+    "VULITQPHUB V2.1\nTheme: Purple\nCreator: sarry_fixe",
+    UDim2.new(1, -20, 0, 65),
+    UDim2.fromOffset(12, 43),
+    12
+).TextColor3 = MUTED
+
+local SettingsDiscord = Button(
+    SettingsCard,
+    "COPY DISCORD LINK",
+    UDim2.new(1, -24, 0, 30),
+    UDim2.fromOffset(12, 92)
+)
+
+SettingsDiscord.MouseButton1Click:Connect(function()
+    if typeof(setclipboard) == "function" then
+        local success = pcall(setclipboard, DISCORD)
+
+        if success then
+            SettingsDiscord.Text = "COPIED!"
+        else
+            SettingsDiscord.Text = "COPY NOT AVAILABLE"
+        end
+    else
+        SettingsDiscord.Text = "discord.gg/6cRkHcNTC"
+    end
+end)
+
+--==================================================
+-- MINIMIZE / REOPEN
+--==================================================
+
+ReopenButton = Button(
+    ScreenGui,
+    "V",
+    UDim2.fromOffset(48, 48),
+    UDim2.new(0, 15, 0.5, -24)
+)
+
+ReopenButton.TextSize = 18
+ReopenButton.TextColor3 = PURPLE
+ReopenButton.Visible = false
+Corner(ReopenButton, 50)
+Stroke(ReopenButton, PURPLE, 2)
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    ReopenButton.Visible = true
+end)
+
+ReopenButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    ReopenButton.Visible = false
+end)
+
+--==================================================
+-- CLEANUP
+--==================================================
+
+local function RestoreCharacter()
+    StopFly()
+
+    SpeedEnabled = false
+    NoclipEnabled = false
+
+    if Humanoid then
+        Humanoid.WalkSpeed = 16
+    end
+
+    for part, oldValue in pairs(OriginalCollision) do
+        if part and part.Parent then
+            part.CanCollide = oldValue
+        end
+    end
+
+    table.clear(OriginalCollision)
+end
+
+CloseButton.MouseButton1Click:Connect(function()
+    RestoreCharacter()
+    ScreenGui:Destroy()
+end)
+
+Player.CharacterAdded:Connect(function(char)
+    StopFly()
+
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    RootPart = char:WaitForChild("HumanoidRootPart")
+
+    if SpeedEnabled then
+        Humanoid.WalkSpeed = WalkSpeedValue
+    end
+end)
+
+print("VULITQPHUB V2.1 PURPLE EDITION LOADED")
