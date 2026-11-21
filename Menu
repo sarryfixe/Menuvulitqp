@@ -1,5 +1,5 @@
 --==================================================
--- VULITQPHUB V2.1 FULL - PURPLE EDITION
+-- VULITQPHUB V2.3 FULL - PURPLE EDITION
 -- by sarry_fixe
 -- INTRO + LOADING + KEY SYSTEM
 -- MAIN MENU + 5 TABS
@@ -13,6 +13,7 @@ local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local GuiService = game:GetService("GuiService")
+local HttpService = game:GetService("HttpService")
 
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
@@ -35,6 +36,8 @@ local MUTED = Color3.fromRGB(170, 150, 190)
 
 local FlySpeed = 50
 local WalkSpeedValue = 50
+local SavePersistentData -- assigned in CTD persistence section
+local CTDSelectedTab = "Trang chủ"
 
 local FlyEnabled = false
 local SpeedEnabled = false
@@ -581,6 +584,7 @@ CreateTab("CTD", 4)
 CreateTab("Cài đặt", 5)
 
 local function SwitchTab(name)
+    CTDSelectedTab = name
     for pageName, page in pairs(Pages) do
         page.Visible = pageName == name
     end
@@ -591,6 +595,7 @@ local function SwitchTab(name)
     end
 
     PageTitle.Text = string.upper(name)
+    if SavePersistentData then SavePersistentData() end
 end
 
 SwitchTab("Trang chủ")
@@ -790,6 +795,7 @@ FlySpeedInput.FocusLost:Connect(function()
     end
 
     FlySpeedInput.Text = tostring(FlySpeed)
+    if SavePersistentData then SavePersistentData() end
 end)
 
 RunService.RenderStepped:Connect(function()
@@ -885,11 +891,12 @@ Stroke(SpeedKnob, PURPLE, 2)
 local function SetSpeed(value)
     WalkSpeedValue = math.clamp(
         math.floor(tonumber(value) or 50),
-        1,
+     1,
         1000
     )
 
     SpeedInput.Text = tostring(WalkSpeedValue)
+    if SavePersistentData then SavePersistentData() end
 
     local percent = WalkSpeedValue / 1000
 
@@ -968,6 +975,7 @@ SpeedToggleButton.MouseButton1Click:Connect(function()
             Humanoid.WalkSpeed = 16
         end
     end
+    if SavePersistentData then SavePersistentData() end
 end)
 
 --==================================================
@@ -1017,6 +1025,7 @@ NoclipToggleButton.MouseButton1Click:Connect(function()
 
         table.clear(OriginalCollision)
     end
+    if SavePersistentData then SavePersistentData() end
 end)
 
 RunService.Stepped:Connect(function()
@@ -1420,15 +1429,134 @@ end)
 -- Roblox Studio - own experience only
 -- by sarry_fixe
 --==================================================
-
 local CTDRecording = false
 local CTDMacroEnabled = false
 local CTDStartedAt = 0
 local CTDLastSample = 0
 local CTDCurrentRecord = nil
+local CTDLastPosition = nil
 local CTDHistory = {}
 local CTDMaxSamples = 1200
+local CTDMaxHistory = 10
 local CTDPlayToken = 0
+local CTDDataFile = "VULITQPHUB_V2_3_DATA.json"
+local CTDLoadedTab = "Trang chủ"
+
+-- Persistence uses the executor's local file functions when available.
+-- In normal Roblox LocalScripts, readfile/writefile are not provided.
+local function CTDEncodeHistory()
+    local output = {}
+    for _, record in ipairs(CTDHistory) do
+        local savedRecord = {
+            name = tostring(record.name or "Ban ghi"),
+            duration = tonumber(record.duration) or 0,
+            events = {}
+        }
+        for _, event in ipairs(record.events or {}) do
+            if event.kind == "move" and typeof(event.position) == "Vector3" then
+                table.insert(savedRecord.events, {
+                    kind = "move",
+                    time = tonumber(event.time) or 0,
+                    position = {
+                        event.position.X,
+                        event.position.Y,
+                        event.position.Z
+                    }
+                })
+            end
+        end
+        table.insert(output, savedRecord)
+    end
+    return output
+end
+
+local function CTDLoadPersistentData()
+    if type(readfile) ~= "function" then
+        return
+    end
+
+    local ok, raw = pcall(readfile, CTDDataFile)
+    if not ok or type(raw) ~= "string" or raw == "" then
+        return
+    end
+
+    local decodedOK, data = pcall(function()
+        return HttpService:JSONDecode(raw)
+    end)
+    if not decodedOK or type(data) ~= "table" then
+        return
+    end
+
+    if type(data.settings) == "table" then
+        FlySpeed = math.clamp(math.floor(tonumber(data.settings.flySpeed) or 50), 1, 1000)
+        WalkSpeedValue = math.clamp(math.floor(tonumber(data.settings.walkSpeed) or 50), 1, 1000)
+        if type(data.settings.selectedTab) == "string" then
+            CTDLoadedTab = data.settings.selectedTab
+        end
+    end
+
+    if type(data.history) == "table" then
+        local first = math.max(1, #data.history - CTDMaxHistory + 1)
+        for i = first, #data.history do
+            local item = data.history[i]
+            if type(item) == "table" and type(item.events) == "table" then
+                local restored = {
+                    name = tostring(item.name or ("Ban ghi " .. tostring(#CTDHistory + 1))),
+                    duration = tonumber(item.duration) or 0,
+                    events = {}
+                }
+                for _, event in ipairs(item.events) do
+                    local pos = event.position
+                    if event.kind == "move" and type(pos) == "table"
+                        and tonumber(pos[1]) and tonumber(pos[2]) and tonumber(pos[3]) then
+                        table.insert(restored.events, {
+                            kind = "move",
+                            time = tonumber(event.time) or 0,
+                            position = Vector3.new(
+                                tonumber(pos[1]),
+                                tonumber(pos[2]),
+                                tonumber(pos[3])
+                            )
+                        })
+                    end
+                end
+                if #restored.events > 0 then
+                    table.insert(CTDHistory, restored)
+                end
+            end
+        end
+    end
+end
+
+SavePersistentData = function()
+    if type(writefile) ~= "function" then
+        return false
+    end
+
+    local payload = {
+        version = 3,
+        settings = {
+            flySpeed = FlySpeed,
+            walkSpeed = WalkSpeedValue,
+            selectedTab = CTDSelectedTab
+        },
+        history = CTDEncodeHistory()
+    }
+
+    local ok = pcall(function()
+        writefile(CTDDataFile, HttpService:JSONEncode(payload))
+    end)
+    return ok
+end
+
+CTDLoadPersistentData()
+
+-- Apply restored values to controls that were created before the CTD section.
+FlySpeedInput.Text = tostring(FlySpeed)
+SpeedInput.Text = tostring(WalkSpeedValue)
+local restoredSpeedPercent = WalkSpeedValue / 1000
+SpeedFill.Size = UDim2.new(restoredSpeedPercent, 0, 1, 0)
+SpeedKnob.Position = UDim2.new(restoredSpeedPercent, -8, 0.5, -8)
 
 -- Other LocalScripts in this experience can register their own
 -- game actions through CTD_RegisterAction:Fire("ActionName", data).
@@ -1453,7 +1581,7 @@ Label(
 
 Label(
     CTDCard,
-    "Ghi vị trí di chuyển và thao tác đã được game đăng ký",
+    "Chỉ ghi vị trí di chuyển - không ghi click hay nút GUI",
     UDim2.new(1, -20, 0, 32),
     UDim2.fromOffset(12, 34),
     10
@@ -1561,6 +1689,8 @@ local function CTDRefreshHistory()
     CTDHistoryLabel.Text = table.concat(lines, "\n")
 end
 
+CTDRefreshHistory()
+
 local function CTDStopRecording()
     if not CTDRecording then
         return
@@ -1594,6 +1724,7 @@ local function CTDStartRecording()
     CTDRecording = true
     CTDStartedAt = os.clock()
     CTDLastSample = 0
+    CTDLastPosition = RootPart.Position
     CTDCurrentRecord = {
         name = "",
         duration = 0,
@@ -1603,25 +1734,11 @@ local function CTDStartRecording()
     CTDRecordButton.Text = "DỪNG GHI"
     CTDRecordButton.BackgroundColor3 = DARK_PURPLE
     CTDFloatingTimer.Visible = true
-    CTDSetStatus("Đang ghi vị trí và thao tác...", PURPLE)
+    CTDSetStatus("Đang ghi chuyển động...", PURPLE)
 end
 
-CTDRegisterAction.Event:Connect(function(actionName, data)
-    if not CTDRecording or not CTDCurrentRecord then
-        return
-    end
-
-    if typeof(actionName) ~= "string" then
-        return
-    end
-
-    table.insert(CTDCurrentRecord.events, {
-        kind = "action",
-        time = os.clock() - CTDStartedAt,
-        name = actionName,
-        data = data
-    })
-end)
+-- Recorder intentionally ignores button clicks, GUI input, and registered actions.
+-- Only character movement samples are stored in CTDCurrentRecord.events.
 
 RunService.Heartbeat:Connect(function()
     if not CTDRecording or not CTDCurrentRecord then
@@ -1640,12 +1757,18 @@ RunService.Heartbeat:Connect(function()
         local root = character and character:FindFirstChild("HumanoidRootPart")
 
         if root then
-            table.insert(CTDCurrentRecord.events, {
-                kind = "move",
-                time = elapsed,
-                position = root.Position,
-                rotation = root.CFrame - root.Position
-            })
+            local movedDistance = CTDLastPosition
+                and (root.Position - CTDLastPosition).Magnitude or math.huge
+
+            -- Ignore idle frames; store a sample only after actual movement.
+            if movedDistance >= 0.35 then
+                table.insert(CTDCurrentRecord.events, {
+                    kind = "move",
+                    time = elapsed,
+                    position = root.Position
+                })
+                CTDLastPosition = root.Position
+            end
 
             if #CTDCurrentRecord.events >= CTDMaxSamples then
                 CTDStopRecording()
@@ -1681,8 +1804,15 @@ CTDSaveButton.MouseButton1Click:Connect(function()
 
     table.insert(CTDHistory, saved)
     CTDCurrentRecord = nil
+    if #CTDHistory > CTDMaxHistory then
+        table.remove(CTDHistory, 1)
+    end
     CTDRefreshHistory()
-    CTDSetStatus("Đã lưu trong lịch sử của phiên hiện tại", PURPLE)
+    local persisted = SavePersistentData and SavePersistentData()
+    CTDSetStatus(
+        persisted and "Đã lưu lịch sử + cài đặt vào thiết bị" or "Đã lưu phiên này; môi trường không hỗ trợ lưu file",
+        persisted and PURPLE or MUTED
+    )
 end)
 
 local function CTDStopMacro()
@@ -1720,7 +1850,7 @@ local function CTDPlayRecord(record)
     task.spawn(function()
         local started = os.clock()
 
-for _, event in ipairs(record.events) do
+        for _, event in ipairs(record.events) do
             if not CTDMacroEnabled or myToken ~= CTDPlayToken then
                 break
             end
@@ -1742,8 +1872,6 @@ for _, event in ipairs(record.events) do
                 if currentHumanoid then
                     currentHumanoid:MoveTo(event.position)
                 end
-            elseif event.kind == "action" then
-                CTDPlayAction:Fire(event.name, event.data)
             end
         end
 
@@ -1813,6 +1941,11 @@ SettingsDiscord.MouseButton1Click:Connect(function()
     end
 end)
 
+-- Restore last selected tab after all pages have been created.
+if Pages[CTDLoadedTab] then
+    SwitchTab(CTDLoadedTab)
+end
+
 --==================================================
 -- MINIMIZE / REOPEN
 --==================================================
@@ -1864,6 +1997,7 @@ local function RestoreCharacter()
 end
 
 CloseButton.MouseButton1Click:Connect(function()
+    if SavePersistentData then SavePersistentData() end
     RestoreCharacter()
     ScreenGui:Destroy()
 end)
@@ -1880,4 +2014,4 @@ Player.CharacterAdded:Connect(function(char)
     end
 end)
 
-print("VULITQPHUB V2.1 PURPLE EDITION LOADED")
+print("VULITQPHUB V2.3 PURPLE EDITION LOADED")
