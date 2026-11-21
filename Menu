@@ -2,7 +2,7 @@
 -- VULITQPHUB V2.1 FULL - PURPLE EDITION
 -- by sarry_fixe
 -- INTRO + LOADING + KEY SYSTEM
--- MAIN MENU + 4 TABS
+-- MAIN MENU + 5 TABS
 -- FLY + SPEED + NOCLIP
 -- SPEED LIMIT: 1 - 1000
 -- MENU: 560 x 360
@@ -571,12 +571,14 @@ end
 local HomePage = CreatePage("Trang chủ")
 local CommonPage = CreatePage("Chung")
 local FunctionPage = CreatePage("TSB")
+local CTDPage = CreatePage("CTD")
 local SettingsPage = CreatePage("Cài đặt")
 
 CreateTab("Trang chủ", 1)
 CreateTab("Chung", 2)
 CreateTab("TSB", 3)
-CreateTab("Cài đặt", 4)
+CreateTab("CTD", 4)
+CreateTab("Cài đặt", 5)
 
 local function SwitchTab(name)
     for pageName, page in pairs(Pages) do
