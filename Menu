@@ -1043,11 +1043,17 @@ end)
 -- CANDY + DOOR
 --==================================================
 
-local HalloweenFolder =
-    workspace:WaitForChild("HalloweenCandy")
+-- Non-blocking lookup: missing event folders must not stop the whole GUI.
+local HalloweenFolder = workspace:FindFirstChild("HalloweenCandy")
+local HalloweenTrees = workspace:FindFirstChild("HalloweenDoorTrees")
 
-local HalloweenTrees =
-    workspace:WaitForChild("HalloweenDoorTrees")
+workspace.ChildAdded:Connect(function(child)
+    if child.Name == "HalloweenCandy" then
+        HalloweenFolder = child
+    elseif child.Name == "HalloweenDoorTrees" then
+        HalloweenTrees = child
+    end
+end)
 
 local FarmCandyEnabled = false
 local FarmCandyThread = nil
@@ -1107,9 +1113,11 @@ end
 -- CANDY DETECTION
 --==================================================
 
-HalloweenFolder.ChildAdded:Connect(function()
-    CandySpawned = true
-end)
+if HalloweenFolder then
+    HalloweenFolder.ChildAdded:Connect(function()
+        CandySpawned = true
+    end)
+end
 
 --==================================================
 -- GET CANDY POSITION
@@ -1163,6 +1171,10 @@ local function FindClosestCandy(root)
     local closestPosition = nil
     local closestDistance = math.huge
 
+    if not HalloweenFolder or not HalloweenFolder.Parent then
+        return nil, nil
+    end
+
     for _, candy in ipairs(HalloweenFolder:GetChildren()) do
 
         local position, part = GetCandyPosition(candy)
@@ -1194,6 +1206,10 @@ local function FindClosestDoor(root)
     local closestPrompt = nil
     local closestPart = nil
     local closestDistance = math.huge
+
+    if not HalloweenTrees or not HalloweenTrees.Parent then
+        return nil, nil
+    end
 
     for _, tree in ipairs(HalloweenTrees:GetChildren()) do
 
@@ -1259,7 +1275,11 @@ local function StartFarmCandy()
     FarmCandyButton.Text = "FARM CANDY: ON"
     FarmCandyButton.BackgroundColor3 = DARK_PURPLE
 
-    SetFarmStatus("Finding candy...", PURPLE)
+    if not HalloweenFolder or not HalloweenTrees then
+        SetFarmStatus("Event folders not found - waiting...", MUTED)
+    else
+        SetFarmStatus("Finding candy...", PURPLE)
+    end
 
     FarmCandyThread = task.spawn(function()
 
@@ -1394,6 +1414,361 @@ end)
 --==================================================
 -- END HALLOWEEN V2
 --==================================================
+
+--==================================================
+-- CTD - MOVEMENT RECORDER / MACRO TESTER
+-- Roblox Studio - own experience only
+-- by sarry_fixe
+--==================================================
+
+local CTDRecording = false
+local CTDMacroEnabled = false
+local CTDStartedAt = 0
+local CTDLastSample = 0
+local CTDCurrentRecord = nil
+local CTDHistory = {}
+local CTDMaxSamples = 1200
+local CTDPlayToken = 0
+
+-- Other LocalScripts in this experience can register their own
+-- game actions through CTD_RegisterAction:Fire("ActionName", data).
+-- During playback they receive CTD_PlayAction.Event(actionName, data).
+local CTDRegisterAction = New("BindableEvent", {
+    Name = "CTD_RegisterAction"
+}, ScreenGui)
+
+local CTDPlayAction = New("BindableEvent", {
+    Name = "CTD_PlayAction"
+}, ScreenGui)
+
+local CTDCard = MakeCard(CTDPage, 235)
+
+Label(
+    CTDCard,
+    "CTD - MOVEMENT RECORDER",
+    UDim2.new(1, -20, 0, 25),
+    UDim2.fromOffset(12, 8),
+    15
+).TextColor3 = PURPLE
+
+Label(
+    CTDCard,
+    "Ghi vị trí di chuyển và thao tác đã được game đăng ký",
+    UDim2.new(1, -20, 0, 32),
+    UDim2.fromOffset(12, 34),
+    10
+).TextColor3 = MUTED
+
+local CTDRecordButton = Button(
+    CTDCard,
+    "QUAY / GHI: OFF",
+    UDim2.fromOffset(145, 32),
+    UDim2.fromOffset(12, 72)
+)
+
+local CTDSaveButton = Button(
+    CTDCard,
+    "SAVE",
+    UDim2.fromOffset(90, 32),
+    UDim2.fromOffset(165, 72)
+)
+
+local CTDMacroButton = Button(
+    CTDCard,
+    "MARO: OFF",
+    UDim2.fromOffset(110, 32),
+    UDim2.fromOffset(265, 72)
+)
+
+local CTDTimer = Label(
+    CTDCard,
+    "Thời gian: 00:00",
+    UDim2.new(1, -24, 0, 22),
+    UDim2.fromOffset(12, 113),
+    12
+)
+CTDTimer.TextColor3 = PURPLE
+
+local CTDStatus = Label(
+    CTDCard,
+    "Status: Sẵn sàng ghi",
+    UDim2.new(1, -24, 0, 22),
+    UDim2.fromOffset(12, 138),
+    10
+)
+CTDStatus.TextColor3 = MUTED
+
+local CTDHistoryLabel = Label(
+    CTDCard,
+    "LỊCH SỬ: Chưa có bản ghi",
+    UDim2.new(1, -24, 0, 48),
+    UDim2.fromOffset(12, 169),
+    10
+)
+CTDHistoryLabel.TextColor3 = WHITE
+CTDHistoryLabel.TextYAlignment = Enum.TextYAlignment.Top
+CTDHistoryLabel.TextWrapped = true
+
+-- A small floating timer appears while recording, outside the main menu.
+local CTDFloatingTimer = New("TextLabel", {
+    Name = "CTD_RecordingTimer",
+    Size = UDim2.fromOffset(150, 30),
+    Position = UDim2.new(1, -165, 0, 18),
+    BackgroundColor3 = BG,
+    BackgroundTransparency = 0.08,
+    Text = "REC 00:00",
+    TextColor3 = PURPLE,
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    Visible = false,
+    ZIndex = 20
+}, ScreenGui)
+Corner(CTDFloatingTimer, 8)
+Stroke(CTDFloatingTimer, PURPLE, 1)
+
+local function CTDFormatTime(seconds)
+    seconds = math.max(0, math.floor(seconds))
+    local minutes = math.floor(seconds / 60)
+    local secs = seconds % 60
+    return string.format("%02d:%02d", minutes, secs)
+end
+
+local function CTDSetStatus(message, color)
+    CTDStatus.Text = "Status: " .. message
+    CTDStatus.TextColor3 = color or MUTED
+end
+
+local function CTDRefreshHistory()
+    if #CTDHistory == 0 then
+        CTDHistoryLabel.Text = "LỊCH SỬ: Chưa có bản ghi"
+        return
+    end
+
+    local lines = {"LỊCH SỬ:"}
+    local first = math.max(1, #CTDHistory - 2)
+
+    for i = #CTDHistory, first, -1 do
+        local item = CTDHistory[i]
+        table.insert(lines, string.format(
+            "%d. %s | %s | %d mốc",
+            i,
+            item.name,
+            CTDFormatTime(item.duration),
+            #item.events
+        ))
+    end
+
+    CTDHistoryLabel.Text = table.concat(lines, "\n")
+end
+
+local function CTDStopRecording()
+    if not CTDRecording then
+        return
+    end
+
+    CTDRecording = false
+    CTDFloatingTimer.Visible = false
+    CTDRecordButton.Text = "QUAY / GHI: OFF"
+    CTDRecordButton.BackgroundColor3 = CARD
+
+    if CTDCurrentRecord then
+        CTDCurrentRecord.duration = os.clock() - CTDStartedAt
+        CTDCurrentRecord.name = "Ban ghi " .. tostring(#CTDHistory + 1)
+        CTDSetStatus(
+            "Đã dừng - nhấn SAVE để lưu vào lịch sử",
+            PURPLE
+        )
+    end
+end
+
+local function CTDStartRecording()
+    if CTDRecording or CTDMacroEnabled then
+        return
+    end
+
+    if not RootPart then
+        CTDSetStatus("Chưa tìm thấy nhân vật", MUTED)
+        return
+    end
+
+    CTDRecording = true
+    CTDStartedAt = os.clock()
+    CTDLastSample = 0
+    CTDCurrentRecord = {
+        name = "",
+        duration = 0,
+        events = {}
+    }
+
+    CTDRecordButton.Text = "DỪNG GHI"
+    CTDRecordButton.BackgroundColor3 = DARK_PURPLE
+    CTDFloatingTimer.Visible = true
+    CTDSetStatus("Đang ghi vị trí và thao tác...", PURPLE)
+end
+
+CTDRegisterAction.Event:Connect(function(actionName, data)
+    if not CTDRecording or not CTDCurrentRecord then
+        return
+    end
+
+    if typeof(actionName) ~= "string" then
+        return
+    end
+
+    table.insert(CTDCurrentRecord.events, {
+        kind = "action",
+        time = os.clock() - CTDStartedAt,
+        name = actionName,
+        data = data
+    })
+end)
+
+RunService.Heartbeat:Connect(function()
+    if not CTDRecording or not CTDCurrentRecord then
+        return
+    end
+
+    local now = os.clock()
+    local elapsed = now - CTDStartedAt
+    CTDTimer.Text = "Thời gian: " .. CTDFormatTime(elapsed)
+    CTDFloatingTimer.Text = "REC " .. CTDFormatTime(elapsed)
+
+    if now - CTDLastSample >= 0.25 then
+        CTDLastSample = now
+
+        local character = Player.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+
+        if root then
+            table.insert(CTDCurrentRecord.events, {
+                kind = "move",
+                time = elapsed,
+                position = root.Position,
+                rotation = root.CFrame - root.Position
+            })
+
+            if #CTDCurrentRecord.events >= CTDMaxSamples then
+                CTDStopRecording()
+                CTDSetStatus("Đã đạt giới hạn bản ghi", MUTED)
+            end
+        end
+    end
+end)
+
+CTDRecordButton.MouseButton1Click:Connect(function()
+    if CTDRecording then
+        CTDStopRecording()
+    else
+        CTDStartRecording()
+    end
+end)
+
+CTDSaveButton.MouseButton1Click:Connect(function()
+    if CTDRecording then
+        CTDStopRecording()
+    end
+
+    if not CTDCurrentRecord or #CTDCurrentRecord.events == 0 then
+        CTDSetStatus("Chưa có dữ liệu để lưu", MUTED)
+        return
+    end
+
+    local saved = {
+        name = "Ban ghi " .. tostring(#CTDHistory + 1),
+        duration = CTDCurrentRecord.duration,
+        events = table.clone(CTDCurrentRecord.events)
+    }
+
+    table.insert(CTDHistory, saved)
+    CTDCurrentRecord = nil
+    CTDRefreshHistory()
+    CTDSetStatus("Đã lưu trong lịch sử của phiên hiện tại", PURPLE)
+end)
+
+local function CTDStopMacro()
+    CTDMacroEnabled = false
+    CTDPlayToken += 1
+    CTDMacroButton.Text = "MARO: OFF"
+    CTDMacroButton.BackgroundColor3 = CARD
+
+    if Humanoid and RootPart then
+        Humanoid:MoveTo(RootPart.Position)
+    end
+end
+
+local function CTDPlayRecord(record)
+    if CTDRecording or not record then
+        return
+    end
+
+    local character = Player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+    if not humanoid then
+        CTDSetStatus("Không tìm thấy Humanoid", MUTED)
+        CTDStopMacro()
+        return
+    end
+
+    CTDPlayToken += 1
+    local myToken = CTDPlayToken
+    CTDMacroEnabled = true
+    CTDMacroButton.Text = "MARO: ON"
+    CTDMacroButton.BackgroundColor3 = DARK_PURPLE
+    CTDSetStatus("Đang phát lại bản ghi...", PURPLE)
+
+    task.spawn(function()
+        local started = os.clock()
+
+for _, event in ipairs(record.events) do
+            if not CTDMacroEnabled or myToken ~= CTDPlayToken then
+                break
+            end
+
+            local waitTime = event.time - (os.clock() - started)
+            if waitTime > 0 then
+                task.wait(waitTime)
+            end
+
+            if not CTDMacroEnabled or myToken ~= CTDPlayToken then
+                break
+            end
+
+            if event.kind == "move" and typeof(event.position) == "Vector3" then
+                local currentCharacter = Player.Character
+                local currentHumanoid = currentCharacter
+                    and currentCharacter:FindFirstChildOfClass("Humanoid")
+
+                if currentHumanoid then
+                    currentHumanoid:MoveTo(event.position)
+                end
+            elseif event.kind == "action" then
+                CTDPlayAction:Fire(event.name, event.data)
+            end
+        end
+
+        if myToken == CTDPlayToken then
+            CTDStopMacro()
+            CTDSetStatus("Phát lại hoàn tất", PURPLE)
+        end
+    end)
+end
+
+CTDMacroButton.MouseButton1Click:Connect(function()
+    if CTDMacroEnabled then
+        CTDStopMacro()
+        CTDSetStatus("Đã tắt Maro", MUTED)
+        return
+    end
+
+    local record = CTDHistory[#CTDHistory]
+    if not record then
+        CTDSetStatus("Hãy ghi và SAVE trước", MUTED)
+        return
+    end
+
+    CTDPlayRecord(record)
+end)
 
 --==================================================
 -- SETTINGS PAGE
