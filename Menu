@@ -1,5 +1,5 @@
 --==================================================
--- VULITQPHUB V2.3 FULL - PURPLE EDITION
+-- VULITQPHUB V2.4 FULL - PURPLE EDITION
 -- by sarry_fixe
 -- INTRO + LOADING + KEY SYSTEM
 -- MAIN MENU + 5 TABS
@@ -891,7 +891,7 @@ Stroke(SpeedKnob, PURPLE, 2)
 local function SetSpeed(value)
     WalkSpeedValue = math.clamp(
         math.floor(tonumber(value) or 50),
-     1,
+           1,
         1000
     )
 
@@ -1354,8 +1354,7 @@ local function StartFarmCandy()
             --======================================
             -- PRIORITY 2: DOOR
             --======================================
-
-            local prompt, part =
+               local prompt, part =
                 FindClosestDoor(root)
 
             if prompt and part then
@@ -1425,73 +1424,69 @@ end)
 --==================================================
 
 --==================================================
--- CTD - INPUT + MOVEMENT MACRO RECORDER
+-- CTD - MACRO ASSISTANT
+-- Checklist / wave guide only; no automated game inputs.
 -- by sarry_fixe
 --==================================================
 
-local CTDRecording = false
-local CTDMacroEnabled = false
-local CTDStartedAt = 0
-local CTDLastSample = 0
-local CTDCurrentRecord = nil
-local CTDHistory = {}
-local CTDMaxSamples = 2400
-local CTDMaxHistory = 10
-local CTDPlayToken = 0
 local CTDDataFile = "VULITQPHUB_V2_3_DATA.json"
 local CTDLoadedTab = "Trang chủ"
-local CTDSelectedIndex = nil
-local CTDHistoryOpen = false
-local CTDKeyState = {}
-local CTDOriginalPosition = MainFrame.Position
+local CTDMacroEnabled = false
+local CTDCurrentWave = 1
+local CTDCompleted = {}
 
-local function CTDCloneData(value, depth)
-    depth = depth or 0
-    if depth > 5 then return nil end
-    local kind = typeof(value)
-    if kind == "string" or kind == "number" or kind == "boolean" then return value end
-    if type(value) ~= "table" then return nil end
-    local result = {}
-    for k, v in pairs(value) do
-        if type(k) == "string" or type(k) == "number" then
-            local safe = CTDCloneData(v, depth + 1)
-            if safe ~= nil then result[k] = safe end
-        end
-    end
-    return result
-end
-
-local function CTDEncodeHistory()
-    local output = {}
-    for _, record in ipairs(CTDHistory) do
-        local saved = {
-            name = tostring(record.name or "Ban ghi"),
-            duration = tonumber(record.duration) or 0,
-            pinned = record.pinned == true,
-            events = {}
-        }
-        for _, event in ipairs(record.events or {}) do
-            local item = {kind = event.kind, time = tonumber(event.time) or 0}
-            if event.kind == "move" and typeof(event.position) == "Vector3" then
-                item.position = {event.position.X, event.position.Y, event.position.Z}
-                item.move = event.move and {event.move.X, event.move.Y, event.move.Z} or nil
-            elseif event.kind == "key" then
-                item.key = tostring(event.key or "")
-                item.down = event.down == true
-            elseif event.kind == "tap" then
-                item.x = tonumber(event.x) or 0
-                item.y = tonumber(event.y) or 0
-                item.input = tostring(event.input or "Touch")
-            elseif event.kind == "action" then
-                item.action = tostring(event.action or "")
-                item.data = CTDCloneData(event.data)
-            end
-            table.insert(saved.events, item)
-        end
-        table.insert(output, saved)
-    end
-    return output
-end
+local MacroTasks = {
+    [1] = "Đặt Slow 1 tại vị trí như ảnh 3.",
+    [2] = "Bỏ qua, không thao tác.",
+    [3] = "Khi đủ 100 tiền: đặt Farm 1, Farm 2 và Farm 3 cạnh nhau như ảnh 4.",
+    [4] = "Đặt Slow 2 cạnh Slow 1; đặt Farm 4 cạnh Farm 3.",
+    [5] = "Chọn Slow 2 và nâng cấp 1 lần (E).",
+    [6] = "Nâng Slow 2 thêm 1 lần.",
+    [7] = "Bỏ qua, không thao tác.",
+    [8] = "Nâng Slow 2 thêm 1 lần.",
+    [9] = "Bỏ qua, không thao tác.",
+    [10] = "Khi đủ 2.5K tiền, nâng Slow 2 thêm 1 lần.",
+    [11] = "Bỏ qua, không thao tác.",
+    [12] = "Bỏ qua, không thao tác.",
+    [13] = "Nâng Slow 2 thêm 1 lần.",
+    [14] = "Khi mỗi Farm đủ 300 tiền, nâng Farm 1 → Farm 4 mỗi con 1 lần.",
+    [15] = "Nâng Farm 4, Farm 3, Farm 2 mỗi con 1 lần.",
+    [16] = "Nâng Farm 1; sau đó nâng Farm 1 và Farm 2 thêm 1 lần.",
+    [17] = "Nâng Farm 3 và Farm 4 mỗi con 1 lần.",
+    [18] = "Nâng Farm 4 một lần; khi đủ 2,000 tiền, nâng Farm 3 một lần.",
+    [19] = "Nâng Farm 2 một lần.",
+    [20] = "Nâng Farm 1 một lần.",
+    [21] = "Nâng Slow 1 thêm 4 lần.",
+    [22] = "Nâng Slow 1 thêm 1 lần.",
+    [23] = "Bỏ qua, không thao tác.",
+    [24] = "Đặt Slow 3 và Slow 4 phía dưới Slow 1 và Slow 2, cách đường quái một ô gần mép; chỉ chọn vị trí hợp lệ màu xanh. Nâng Slow 3 năm lần.",
+    [25] = "Nâng Slow 4 bốn lần.",
+    [26] = "Nâng Slow 4 thêm 1 lần.",
+    [27] = "Đặt BTH 1, BTH 2, BTH 3 phía trên Slow 3–4, cách đường quái một ô; chọn vị trí hợp lệ. Nâng BTH 1 ba lần.",
+    [28] = "Tiếp tục căn vị trí nếu cần; chuẩn bị nâng cấp BTH 1 theo lịch.",
+    [29] = "Nâng BTH 1 thêm 1 lần.",
+    [30] = "Nâng BTH 1 thêm 1 lần.",
+    [31] = "Chọn BTH 2 và nâng 2 lần.",
+    [32] = "Nâng BTH 2 thêm 1 lần.",
+    [33] = "Nâng BTH 2 thêm 1 lần.",
+    [34] = "Nâng BTH 2 thêm 1 lần; chuyển sang BTH 3 và nâng 1 lần.",
+    [35] = "Nâng BTH 3 hai lần.",
+    [36] = "Khi đủ 4,000 tiền, nâng BTH 3 một lần.",
+    [37] = "Khi đủ 5,000 tiền, nâng BTH 3 một lần.",
+    [38] = "Đặt BTH 4, BTH 5, BTH 6 phía trên BTH 1, 2, 3 theo thứ tự.",
+    [39] = "Nâng BTH 4 thêm 5 lần.",
+    [40] = "Chọn BTH 5 và nâng 2 lần.",
+    [41] = "Nâng BTH 5 thêm 2 lần.",
+    [42] = "Khi đủ 7,000 tiền, nâng BTH 5 thêm 2 lần.",
+    [43] = "Khi đủ 5,000 tiền, nâng BTH 5 lần cuối 1 lần.",
+    [44] = "Chọn BTH 6 và nâng 3 lần.",
+    [45] = "Nâng BTH 6 thêm 2 lần.",
+    [46] = "Đặt quân giải choáng cạnh BTH 6.",
+    [47] = "Nâng quân giải choáng 3 lần.",
+    [48] = "Bỏ qua, không thao tác.",
+    [49] = "Bỏ qua, không thao tác.",
+    [50] = "Bán Farm 1–4; đặt 2 Laser phía sau Slow 3–4 và nâng mỗi Laser 3 lần. Khi thắng, chọn Play Again để chơi ván tiếp theo."
+}
 
 local function CTDLoadPersistentData()
     if type(readfile) ~= "function" then return end
@@ -1499,49 +1494,18 @@ local function CTDLoadPersistentData()
     if not ok or type(raw) ~= "string" or raw == "" then return end
     local decodedOK, data = pcall(function() return HttpService:JSONDecode(raw) end)
     if not decodedOK or type(data) ~= "table" then return end
-
     if type(data.settings) == "table" then
         FlySpeed = math.clamp(math.floor(tonumber(data.settings.flySpeed) or 50), 1, 1000)
         WalkSpeedValue = math.clamp(math.floor(tonumber(data.settings.walkSpeed) or 50), 1, 1000)
         if type(data.settings.selectedTab) == "string" then CTDLoadedTab = data.settings.selectedTab end
-        if type(data.settings.historyOpen) == "boolean" then CTDHistoryOpen = data.settings.historyOpen end
-        if type(data.settings.menuX) == "number" and type(data.settings.menuY) == "number" then
-            CTDOriginalPosition = UDim2.new(0.5, data.settings.menuX, 0.5, data.settings.menuY)
-        end
     end
-
-    if type(data.history) == "table" then
-        for _, item in ipairs(data.history) do
-            if #CTDHistory >= CTDMaxHistory then break end
-            if type(item) == "table" and type(item.events) == "table" then
-                local restored = {
-                    name = tostring(item.name or ("Ban ghi " .. (#CTDHistory + 1))),
-                    duration = tonumber(item.duration) or 0,
-                    pinned = item.pinned == true,
-                    events = {}
-                }
-                for _, event in ipairs(item.events) do
-                    if type(event) == "table" then
-                        local e = {kind = event.kind, time = tonumber(event.time) or 0}
-                        if event.kind == "move" and type(event.position) == "table"
-                            and tonumber(event.position[1]) and tonumber(event.position[2]) and tonumber(event.position[3]) then
-                            e.position = Vector3.new(tonumber(event.position[1]), tonumber(event.position[2]), tonumber(event.position[3]))
-                            if type(event.move) == "table" then
-                                e.move = Vector3.new(tonumber(event.move[1]) or 0, tonumber(event.move[2]) or 0, tonumber(event.move[3]) or 0)
-                            end
-                        elseif event.kind == "key" and type(event.key) == "string" then
-                            e.key, e.down = event.key, event.down == true
-                        elseif event.kind == "tap" then
-                            e.x, e.y, e.input = tonumber(event.x) or 0, tonumber(event.y) or 0, tostring(event.input or "Touch")
-                        elseif event.kind == "action" and type(event.action) == "string" then
-                            e.action, e.data = event.action, CTDCloneData(event.data)
-                        end
-                        if e.kind == "move" or e.kind == "key" or e.kind == "tap" or e.kind == "action" then
-                            table.insert(restored.events, e)
-                        end
-                    end
-                end
-                if #restored.events > 0 then table.insert(CTDHistory, restored) end
+    local macro = data.macro
+    if type(macro) == "table" then
+        CTDCurrentWave = math.clamp(math.floor(tonumber(macro.currentWave) or 1), 1, 50)
+        if type(macro.completed) == "table" then
+            for k, v in pairs(macro.completed) do
+                local n = tonumber(k)
+                if n and n >= 1 and n <= 50 and v == true then CTDCompleted[n] = true end
             end
         end
     end
@@ -1549,21 +1513,16 @@ end
 
 SavePersistentData = function()
     if type(writefile) ~= "function" then return false end
-    local pos = MainFrame.Position
+    local completed = {}
+    for wave, done in pairs(CTDCompleted) do
+        if done then completed[tostring(wave)] = true end
+    end
     local payload = {
         version = 4,
-        settings = {
-            flySpeed = FlySpeed,
-            walkSpeed = WalkSpeedValue,
-            selectedTab = CTDSelectedTab,
-            historyOpen = CTDHistoryOpen,
-            menuX = pos.X.Offset,
-            menuY = pos.Y.Offset
-        },
-        history = CTDEncodeHistory()
+        settings = {flySpeed = FlySpeed, walkSpeed = WalkSpeedValue, selectedTab = CTDSelectedTab},
+        macro = {currentWave = CTDCurrentWave, completed = completed}
     }
-    local ok = pcall(function() writefile(CTDDataFile, HttpService:JSONEncode(payload)) end)
-    return ok
+    return pcall(function() writefile(CTDDataFile, HttpService:JSONEncode(payload)) end)
 end
 
 CTDLoadPersistentData()
@@ -1572,335 +1531,59 @@ SpeedInput.Text = tostring(WalkSpeedValue)
 local restoredSpeedPercent = WalkSpeedValue / 1000
 SpeedFill.Size = UDim2.new(restoredSpeedPercent, 0, 1, 0)
 SpeedKnob.Position = UDim2.new(restoredSpeedPercent, -8, 0.5, -8)
-MainFrame.Position = CTDOriginalPosition
 
--- CTD_RegisterAction:Fire("ActionName", optionalData)
--- Game-specific LocalScripts should listen to CTD_PlayAction.Event to perform
--- their own legitimate button/game action during macro playback.
-local CTDRegisterAction = New("BindableEvent", {Name = "CTD_RegisterAction"}, ScreenGui)
-local CTDPlayAction = New("BindableEvent", {Name = "CTD_PlayAction"}, ScreenGui)
+local CTDCard = MakeCard(CTDPage, 305)
+Label(CTDCard, "CTD - MACRO ASSISTANT", UDim2.new(1, -20, 0, 25), UDim2.fromOffset(12, 8), 15).TextColor3 = PURPLE
+Label(CTDCard, "Hướng dẫn AFK farm Camera Tower Defense • Wave 1–50", UDim2.new(1, -20, 0, 24), UDim2.fromOffset(12, 34), 10).TextColor3 = MUTED
 
-local CTDCard = MakeCard(CTDPage, 315)
-Label(CTDCard, "CTD - INPUT & MOVEMENT RECORDER", UDim2.new(1, -20, 0, 25), UDim2.fromOffset(12, 8), 14).TextColor3 = PURPLE
-Label(CTDCard, "Ghi chuyển động, phím và thao tác đã đăng ký trong game", UDim2.new(1, -20, 0, 28), UDim2.fromOffset(12, 34), 10).TextColor3 = MUTED
-
-local CTDRecordButton = Button(CTDCard, "QUAY / GHI: OFF", UDim2.fromOffset(145, 32), UDim2.fromOffset(12, 69))
-local CTDSaveButton = Button(CTDCard, "SAVE", UDim2.fromOffset(75, 32), UDim2.fromOffset(165, 69))
-local CTDMacroButton = Button(CTDCard, "PHÁT: OFF", UDim2.fromOffset(90, 32), UDim2.fromOffset(249, 69))
-local CTDHistoryButton = Button(CTDCard, "LỊCH SỬ: MỞ", UDim2.fromOffset(105, 32), UDim2.fromOffset(347, 69))
-local CTDTimer = Label(CTDCard, "Thời gian: 00:00", UDim2.new(1, -24, 0, 22), UDim2.fromOffset(12, 110), 12)
-CTDTimer.TextColor3 = PURPLE
-local CTDStatus = Label(CTDCard, "Status: Sẵn sàng ghi", UDim2.new(1, -24, 0, 22), UDim2.fromOffset(12, 135), 10)
+local CTDMacroButton = Button(CTDCard, "MACRO ASSISTANT: OFF", UDim2.fromOffset(190, 32), UDim2.fromOffset(12, 64))
+local CTDWaveInput = Input(CTDCard, "Wave 1-50", UDim2.fromOffset(90, 32), UDim2.fromOffset(210, 64), CTDCurrentWave)
+local CTDPrevButton = Button(CTDCard, "◀", UDim2.fromOffset(38, 32), UDim2.fromOffset(310, 64))
+local CTDNextButton = Button(CTDCard, "▶", UDim2.fromOffset(38, 32), UDim2.fromOffset(354, 64))
+local CTDMarkButton = Button(CTDCard, "ĐÁNH DẤU XONG", UDim2.fromOffset(135, 30), UDim2.fromOffset(12, 105))
+local CTDResetButton = Button(CTDCard, "RESET TIẾN ĐỘ", UDim2.fromOffset(120, 30), UDim2.fromOffset(155, 105))
+local CTDWaveTitle = Label(CTDCard, "WAVE 1 / 50", UDim2.new(1, -24, 0, 25), UDim2.fromOffset(12, 146), 14)
+CTDWaveTitle.TextColor3 = PURPLE
+local CTDTaskLabel = Label(CTDCard, "", UDim2.new(1, -24, 0, 75), UDim2.fromOffset(12, 174), 12)
+CTDTaskLabel.TextColor3 = WHITE
+CTDTaskLabel.TextWrapped = true
+CTDTaskLabel.TextYAlignment = Enum.TextYAlignment.Top
+local CTDStatus = Label(CTDCard, "Status: Sẵn sàng", UDim2.new(1, -24, 0, 25), UDim2.fromOffset(12, 255), 10)
 CTDStatus.TextColor3 = MUTED
-local CTDSelectedLabel = Label(CTDCard, "Đang chọn: Chưa có bản ghi", UDim2.new(1, -24, 0, 22), UDim2.fromOffset(12, 158), 10)
-CTDSelectedLabel.TextColor3 = WHITE
 
-local CTDFloatingTimer = New("TextLabel", {
-    Name = "CTD_RecordingTimer", Size = UDim2.fromOffset(150, 30),
-    Position = UDim2.new(1, -165, 0, 18), BackgroundColor3 = BG,
-    BackgroundTransparency = 0.08, Text = "REC 00:00", TextColor3 = PURPLE,
-    Font = Enum.Font.GothamBold, TextSize = 13, Visible = false, ZIndex = 20
-}, ScreenGui)
-Corner(CTDFloatingTimer, 8)
-Stroke(CTDFloatingTimer, PURPLE, 1)
-
-local CTDHistoryFrame = New("Frame", {
-    Size = UDim2.new(1, -24, 0, 78), Position = UDim2.fromOffset(12, 188),
-    BackgroundColor3 = BG, Visible = CTDHistoryOpen
-}, CTDCard)
-CTDCard.Size = UDim2.new(1, -16, 0, CTDHistoryOpen and 315 or 188)
-Corner(CTDHistoryFrame, 8)
-Stroke(CTDHistoryFrame, PURPLE, 1)
-local CTDHistoryScroll = New("ScrollingFrame", {
-    Size = UDim2.new(1, -10, 1, -10), Position = UDim2.fromOffset(5, 5),
-    BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3,
-    ScrollBarImageColor3 = PURPLE, CanvasSize = UDim2.new(0, 0, 0, 0)
-}, CTDHistoryFrame)
-local CTDHistoryLayout = New("UIListLayout", {Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}, CTDHistoryScroll)
-CTDHistoryLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    CTDHistoryScroll.CanvasSize = UDim2.new(0, 0, 0, CTDHistoryLayout.AbsoluteContentSize.Y + 6)
-end)
-
-local CTDPinButton = Button(CTDCard, "GHIM: OFF", UDim2.fromOffset(95, 27), UDim2.fromOffset(12, 275))
-local CTDDeleteButton = Button(CTDCard, "XÓA BẢN GHI", UDim2.fromOffset(115, 27), UDim2.fromOffset(115, 275))
-CTDPinButton.Visible = CTDHistoryOpen
-CTDDeleteButton.Visible = CTDHistoryOpen
-
-local function CTDFormatTime(seconds)
-    seconds = math.max(0, math.floor(seconds or 0))
-    return string.format("%02d:%02d", math.floor(seconds / 60), seconds % 60)
-end
-local function CTDSetStatus(message, color)
-    CTDStatus.Text = "Status: " .. message
-    CTDStatus.TextColor3 = color or MUTED
-end
-local function CTDGetSelected()
-    return CTDSelectedIndex and CTDHistory[CTDSelectedIndex] or nil
-end
-local function CTDRefreshHistory()
-    for _, child in ipairs(CTDHistoryScroll:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
-    if #CTDHistory == 0 then
-        CTDSelectedIndex = nil
-        CTDSelectedLabel.Text = "Đang chọn: Chưa có bản ghi"
-        CTDPinButton.Text = "GHIM: OFF"
-        return
-    end
-    if not CTDSelectedIndex or not CTDHistory[CTDSelectedIndex] then CTDSelectedIndex = #CTDHistory end
-    for i = #CTDHistory, 1, -1 do
-        local record = CTDHistory[i]
-        local selected = i == CTDSelectedIndex
-        local b = Button(CTDHistoryScroll,
-            (record.pinned and "★ " or "") .. record.name .. " | " .. CTDFormatTime(record.duration) .. " | " .. #record.events .. " thao tác",
-            UDim2.new(1, -4, 0, 27), UDim2.new(0, 0, 0, 0))
-        b.LayoutOrder = #CTDHistory - i + 1
-        b.BackgroundColor3 = selected and DARK_PURPLE or CARD
-        b.MouseButton1Click:Connect(function()
-            CTDSelectedIndex = i
-            CTDRefreshHistory()
-        end)
-    end
-    local selected = CTDGetSelected()
-    CTDSelectedLabel.Text = "Đang chọn: " .. (selected and selected.name or "Chưa có")
-    CTDPinButton.Text = selected and (selected.pinned and "BỎ GHIM" or "GHIM: OFF") or "GHIM: OFF"
-end
-
-CTDHistoryButton.MouseButton1Click:Connect(function()
-    CTDHistoryOpen = not CTDHistoryOpen
-    CTDHistoryFrame.Visible = CTDHistoryOpen
-    CTDPinButton.Visible = CTDHistoryOpen
-    CTDDeleteButton.Visible = CTDHistoryOpen
-    CTDHistoryButton.Text = CTDHistoryOpen and "LỊCH SỬ: ĐÓNG" or "LỊCH SỬ: MỞ"
-    CTDCard.Size = UDim2.new(1, -16, 0, CTDHistoryOpen and 315 or 188)
-    CTDSetStatus(CTDHistoryOpen and "Đã mở lịch sử" or "Đã đóng lịch sử", PURPLE)
+local function CTDRefreshWave()
+    CTDCurrentWave = math.clamp(math.floor(tonumber(CTDCurrentWave) or 1), 1, 50)
+    CTDWaveInput.Text = tostring(CTDCurrentWave)
+    CTDWaveTitle.Text = "WAVE " .. CTDCurrentWave .. " / 50" .. (CTDCompleted[CTDCurrentWave] and "  ✓ HOÀN THÀNH" or "")
+    CTDTaskLabel.Text = MacroTasks[CTDCurrentWave] or "Chưa có hướng dẫn cho wave này."
+    CTDStatus.Text = "Tiến độ: " .. tostring((function() local n=0 for _,v in pairs(CTDCompleted) do if v then n+=1 end end return n end)()) .. "/50 wave đã hoàn thành"
     if SavePersistentData then SavePersistentData() end
-end)
-
-local function CTDAddEvent(event)
-    if not CTDRecording or not CTDCurrentRecord then return end
-    event.time = math.max(0, os.clock() - CTDStartedAt)
-    table.insert(CTDCurrentRecord.events, event)
-    if #CTDCurrentRecord.events >= CTDMaxSamples then
-        CTDRecording = false
-        CTDFloatingTimer.Visible = false
-        CTDRecordButton.Text = "QUAY / GHI: OFF"
-        CTDRecordButton.BackgroundColor3 = CARD
-        CTDCurrentRecord.duration = os.clock() - CTDStartedAt
-        CTDSetStatus("Đã đạt giới hạn thao tác, nhấn SAVE", MUTED)
-    end
 end
 
-local function CTDStopRecording()
-    if not CTDRecording then return end
-    CTDRecording = false
-    CTDFloatingTimer.Visible = false
-    CTDRecordButton.Text = "QUAY / GHI: OFF"
-    CTDRecordButton.BackgroundColor3 = CARD
-    if CTDCurrentRecord then
-        CTDCurrentRecord.duration = os.clock() - CTDStartedAt
-        CTDSetStatus("Đã dừng - nhấn SAVE để lưu macro", PURPLE)
-    end
-end
-local function CTDStartRecording()
-    if CTDRecording or CTDMacroEnabled then return end
-    if not Player.Character or not Player.Character:FindFirstChild("HumanoidRootPart") then
-        CTDSetStatus("Chưa tìm thấy nhân vật", MUTED)
-        return
-    end
-    CTDRecording = true
-    CTDStartedAt = os.clock()
-    CTDLastSample = 0
-    CTDCurrentRecord = {name = "", duration = 0, events = {}}
-    CTDRecordButton.Text = "DỪNG GHI"
-    CTDRecordButton.BackgroundColor3 = DARK_PURPLE
-    CTDFloatingTimer.Visible = true
-    CTDSetStatus("Đang ghi chuyển động và đầu vào...", PURPLE)
+local function CTDSetMacroAssistant(enabled)
+    CTDMacroEnabled = enabled
+    CTDMacroButton.Text = enabled and "MACRO ASSISTANT: ON" or "MACRO ASSISTANT: OFF"
+    CTDMacroButton.BackgroundColor3 = enabled and DARK_PURPLE or CARD
+    CTDStatus.Text = enabled and "Trợ lý bật: theo dõi checklist, không tự bấm trong game" or "Trợ lý đã tắt"
 end
 
--- Capture keyboard/touch/mouse input that reaches the game. UI input from this hub is ignored.
-local function CTDPointInsideHub(point)
-    local p, size = MainFrame.AbsolutePosition, MainFrame.AbsoluteSize
-    if point.X >= p.X and point.X <= p.X + size.X and point.Y >= p.Y and point.Y <= p.Y + size.Y then return true end
-    if ReopenButton and ReopenButton.Visible then
-        local rp, rs = ReopenButton.AbsolutePosition, ReopenButton.AbsoluteSize
-        if point.X >= rp.X and point.X <= rp.X + rs.X and point.Y >= rp.Y and point.Y <= rp.Y + rs.Y then return true end
-    end
-    return false
-end
-
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if not CTDRecording then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        if gameProcessed then return end
-        local key = input.KeyCode.Name
-        if not CTDKeyState[key] then
-            CTDKeyState[key] = true
-            CTDAddEvent({kind = "key", key = key, down = true})
-        end
-    elseif input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if not CTDPointInsideHub(input.Position) then
-            CTDAddEvent({kind = "tap", x = input.Position.X, y = input.Position.Y, input = input.UserInputType.Name})
-        end
-    end
+CTDMacroButton.MouseButton1Click:Connect(function() CTDSetMacroAssistant(not CTDMacroEnabled) end)
+CTDPrevButton.MouseButton1Click:Connect(function() CTDCurrentWave -= 1 CTDRefreshWave() end)
+CTDNextButton.MouseButton1Click:Connect(function() CTDCurrentWave += 1 CTDRefreshWave() end)
+CTDWaveInput.FocusLost:Connect(function()
+    CTDCurrentWave = math.clamp(math.floor(tonumber(CTDWaveInput.Text) or CTDCurrentWave), 1, 50)
+    CTDRefreshWave()
 end)
-UIS.InputEnded:Connect(function(input, gameProcessed)
-    if not CTDRecording then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        if gameProcessed then return end
-        local key = input.KeyCode.Name
-        if CTDKeyState[key] then
-            CTDKeyState[key] = nil
-            CTDAddEvent({kind = "key", key = key, down = false})
-        end
-    end
+CTDMarkButton.MouseButton1Click:Connect(function()
+    CTDCompleted[CTDCurrentWave] = not CTDCompleted[CTDCurrentWave]
+    CTDRefreshWave()
 end)
-
-CTDRegisterAction.Event:Connect(function(actionName, data)
-    if type(actionName) == "string" then
-        CTDAddEvent({kind = "action", action = actionName, data = CTDCloneData(data)})
-    end
+CTDResetButton.MouseButton1Click:Connect(function()
+    CTDCompleted = {}
+    CTDCurrentWave = 1
+    CTDRefreshWave()
 end)
-
-RunService.Heartbeat:Connect(function()
-    if not CTDRecording or not CTDCurrentRecord then return end
-    local elapsed = os.clock() - CTDStartedAt
-    CTDTimer.Text = "Thời gian: " .. CTDFormatTime(elapsed)
-    CTDFloatingTimer.Text = "REC " .. CTDFormatTime(elapsed)
-    if os.clock() - CTDLastSample >= 0.18 then
-        CTDLastSample = os.clock()
-        local char = Player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-        if root then
-            local move = humanoid and humanoid.MoveDirection or Vector3.zero
-            local previous = CTDCurrentRecord.lastPosition
-            if not previous or (root.Position - previous).Magnitude >= 0.25 then
-                CTDAddEvent({kind = "move", position = root.Position, move = move})
-                CTDCurrentRecord.lastPosition = root.Position
-            end
-        end
-    end
-end)
-
-CTDRecordButton.MouseButton1Click:Connect(function()
-    if CTDRecording then CTDStopRecording() else CTDStartRecording() end
-end)
-
-CTDSaveButton.MouseButton1Click:Connect(function()
-    if CTDRecording then CTDStopRecording() end
-    if not CTDCurrentRecord or #CTDCurrentRecord.events == 0 then
-        CTDSetStatus("Chưa có dữ liệu để lưu", MUTED)
-        return
-    end
-    local saved = {
-        name = "Macro " .. tostring(os.date("%d-%m %H:%M:%S")),
-        duration = CTDCurrentRecord.duration,
-        pinned = false,
-        events = CTDCurrentRecord.events
-    }
-    if #CTDHistory >= CTDMaxHistory then
-        local removeIndex
-        for i, item in ipairs(CTDHistory) do
-            if not item.pinned then removeIndex = i break end
-        end
-        if not removeIndex then
-            CTDSetStatus("Đủ 10 bản ghi đều đã ghim - bỏ ghim một bản trước", MUTED)
-            return
-        end
-        table.remove(CTDHistory, removeIndex)
-        if CTDSelectedIndex and CTDSelectedIndex > removeIndex then CTDSelectedIndex -= 1 end
-    end
-    table.insert(CTDHistory, saved)
-    CTDSelectedIndex = #CTDHistory
-    CTDCurrentRecord = nil
-    CTDRefreshHistory()
-    local persisted = SavePersistentData and SavePersistentData()
-    CTDSetStatus(persisted and "Đã lưu macro và lịch sử vào thiết bị" or "Đã lưu trong phiên này; cần môi trường hỗ trợ file để giữ sau khi thoát", persisted and PURPLE or MUTED)
-end)
-
-local function CTDStopMacro()
-    CTDMacroEnabled = false
-    CTDPlayToken += 1
-    CTDMacroButton.Text = "PHÁT: OFF"
-    CTDMacroButton.BackgroundColor3 = CARD
-    local char = Player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then hum:Move(Vector3.zero, false) end
-end
-
-local function CTDPlayRecord(record)
-    if CTDRecording or not record then return end
-    local char = Player.Character
-    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-    if not humanoid then CTDSetStatus("Không tìm thấy nhân vật", MUTED) return end
-    CTDPlayToken += 1
-    local token = CTDPlayToken
-    CTDMacroEnabled = true
-    CTDMacroButton.Text = "DỪNG PHÁT"
-    CTDMacroButton.BackgroundColor3 = DARK_PURPLE
-    CTDSetStatus("Đang phát: " .. record.name, PURPLE)
-    task.spawn(function()
-        local started = os.clock()
-        local held = {}
-        for _, event in ipairs(record.events) do
-            if not CTDMacroEnabled or token ~= CTDPlayToken then break end
-            local delayTime = event.time - (os.clock() - started)
-            if delayTime > 0 then task.wait(delayTime) end
-            if not CTDMacroEnabled or token ~= CTDPlayToken then break end
-            local currentChar = Player.Character
-            local currentHumanoid = currentChar and currentChar:FindFirstChildOfClass("Humanoid")
-            if event.kind == "move" and currentHumanoid and typeof(event.position) == "Vector3" then
-                -- Use the recorded path for consistent movement replay in the same experience.
-                currentHumanoid:MoveTo(event.position)
-            elseif event.kind == "key" then
-                held[event.key] = event.down and true or nil
-                if event.key == "Space" and event.down and currentHumanoid then currentHumanoid.Jump = true end
-            elseif event.kind == "action" then
-                CTDPlayAction:Fire(event.action, CTDCloneData(event.data))
-            elseif event.kind == "tap" then
-                -- Roblox LocalScripts cannot synthesize a real touch/mouse click.
-                -- The tap is retained in the macro; game-specific actions use CTD_RegisterAction.
-                CTDPlayAction:Fire("CTD_TapMarker", {x = event.x, y = event.y, input = event.input})
-            end
-        end
-        if token == CTDPlayToken then
-            CTDStopMacro()
-            CTDSetStatus("Phát lại hoàn tất (nút game cần đăng ký CTD action)", PURPLE)
-        end
-    end)
-end
-
-CTDMacroButton.MouseButton1Click:Connect(function()
-    if CTDMacroEnabled then
-        CTDStopMacro()
-        CTDSetStatus("Đã dừng phát", MUTED)
-    else
-        local record = CTDGetSelected()
-        if not record then CTDSetStatus("Chọn một macro trong LỊCH SỬ trước", MUTED) else CTDPlayRecord(record) end
-    end
-end)
-
-CTDPinButton.MouseButton1Click:Connect(function()
-    local record = CTDGetSelected()
-    if not record then CTDSetStatus("Chưa chọn bản ghi", MUTED) return end
-    record.pinned = not record.pinned
-    CTDRefreshHistory()
-    if SavePersistentData then SavePersistentData() end
-    CTDSetStatus(record.pinned and "Đã ghim bản ghi" or "Đã bỏ ghim bản ghi", PURPLE)
-end)
-
-CTDDeleteButton.MouseButton1Click:Connect(function()
-    local record = CTDGetSelected()
-    if not record then CTDSetStatus("Chưa chọn bản ghi", MUTED) return end
-    table.remove(CTDHistory, CTDSelectedIndex)
-    CTDSelectedIndex = math.min(CTDSelectedIndex, #CTDHistory)
-    CTDRefreshHistory()
-    if SavePersistentData then SavePersistentData() end
-    CTDSetStatus("Đã xóa bản ghi đã chọn", PURPLE)
-end)
-
-CTDRefreshHistory()
+CTDRefreshWave()
 
 --==================================================
 -- SETTINGS PAGE
@@ -1968,7 +1651,6 @@ Corner(ReopenButton, 50)
 Stroke(ReopenButton, PURPLE, 2)
 
 MinimizeButton.MouseButton1Click:Connect(function()
-    if SavePersistentData then SavePersistentData() end
     MainFrame.Visible = false
     ReopenButton.Visible = true
 end)
@@ -1976,7 +1658,6 @@ end)
 ReopenButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = true
     ReopenButton.Visible = false
-    if SavePersistentData then SavePersistentData() end
 end)
 
 --==================================================
